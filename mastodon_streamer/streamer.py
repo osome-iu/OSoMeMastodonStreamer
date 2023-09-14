@@ -12,31 +12,34 @@ Outputs:
 Authors: Pasan Kamburugamuwa
 """
 
-import json
-import os
-import datetime
+import datetime, gzip, os, json
 from mastodon import Mastodon, StreamListener
 from library import backend_util
-import gzip
 
 # Specify the directory path where the files will be stored
 DATA_DERIVED_DIR = "/Users/pkamburu/IUNI/mastodon/data_derived"
 LOG_DIR = "/Users/pkamburu/IUNI/mastodon/logs"
 
 # Create a logger
-LOG_FNAME = "mastodon_logging.log"
+LOG_FNAME = "mastodon_streamer_logging.log"
 script_name = os.path.basename(__file__)
 logger = backend_util.get_logger(LOG_DIR, LOG_FNAME, script_name=script_name, also_print=True)
 
 
 # Define a custom stream listener
 class MastodonStreamListener(StreamListener):
-    def __init__(self):
+    def __init__(self, instance_name):
         super().__init__()
-        self.posts_count = 0
-        self.current_date = datetime.datetime.now().date()
-        self.current_hour = datetime.datetime.now().hour
+
+        self.instance_name = instance_name
+
         self.current_hour_posts = 0
+        self.posts_count_per_day = 0
+
+        # Get the current date
+        self.current_date = datetime.datetime.now().date()
+        # Get the current hour
+        self.current_hour = datetime.datetime.now().hour
         self.file_name = self.get_file_name()
 
     def get_file_name(self):
@@ -45,8 +48,9 @@ class MastodonStreamListener(StreamListener):
         current_date = datetime.datetime.now().strftime("%Y-%m-%d")
 
         # Create the directory if it doesn't exist
-        os.makedirs(os.path.join(DATA_DERIVED_DIR, current_month), exist_ok=True)
-        return os.path.join(DATA_DERIVED_DIR, current_month, f"mastdonsocial_{current_date}.json")
+        instance_name = self.instance_name[len("https://"):]
+        return os.path.join(DATA_DERIVED_DIR, current_month, f"{current_date}", f"{instance_name}_{current_date}.json")
+
 
     def on_update(self, status):
         """
@@ -59,13 +63,13 @@ class MastodonStreamListener(StreamListener):
         .gz file create and remove the mastodon_{current_date}.json file.
         """
         # Increment the post count for each received toot
-        self.posts_count += 1
+        self.posts_count_per_day += 1
         self.current_hour_posts += 1
 
         #In this function is used to check if there is a new date started.
         now = datetime.datetime.now()
         if now.date() != self.current_date:
-            self.end_of_date()
+            self.end_of_day()
 
         # Check if an hour has passed, print the result and reset the counter
         current_hour = datetime.datetime.now().hour
@@ -76,12 +80,28 @@ class MastodonStreamListener(StreamListener):
 
         # Write toot info to JSON file
         toot_info = {
-            'content': status['content'],
-            'username': status['account']['username'],
-            'status_id': status['id'],
-            'created_at': status['created_at'],
-            'visibility': status['visibility'],
-            'post_url': status['url']
+            'id': status['id'],  # ID of the status in the database.
+            'uri': status['uri'],  # URI of the status used for federation
+            'created_at': status['created_at'],  # The date when this status was created
+            'account': status['account'],  # The account that authored this status.
+            'content': status['content'],  # HTML-encoded status content.
+            'visibility': status['visibility'],  # Toot visibility ('public', 'unlisted', 'private', or 'direct')
+            'sensitive': status['sensitive'],  # Is this status marked as sensitive content?
+            'spoiler_text': status['spoiler_text'],# Subject or summary line, below which status content is collapsed until expanded.
+            'media_attachments': status['media_attachments'],  # Media that is attached to this status.
+            'mentions': status['mentions'],  # Mentions of users within the status content.
+            'tags': status['tags'],  # Hashtags used within the status content.
+            'emojis': status['emojis'],  # Custom emoji to be used when rendering status content.
+            'favourites_count': status['favourites_count'],  # How many favourites this status has received.
+            'replies_count': status['replies_count'],  # How many replies this status has received.
+            'url': status['url'],  # A link to the status’s HTML representation.
+            'in_reply_to_id': status['in_reply_to_id'],  # ID of the status being replied to.
+            'in_reply_to_account_id': status['in_reply_to_account_id'], # ID of the account that authored the status being replied to.
+            'reblog': status['reblog'],  # The status being reblogged.
+            'poll': status['poll'],  # The poll attached to the status.
+            'card': status['card'],  # Preview card for links included within status content.
+            'language': status['language'],  # Primary language of this status.
+            'edited_at': status['edited_at'],  # Timestamp of when the status was last edited.
         }
 
         # Create directories for the current month and date if they don't exist
@@ -107,7 +127,7 @@ class MastodonStreamListener(StreamListener):
         # Get file size in bytes
         file_size = os.path.getsize(self.file_name)
 
-        # Print the result
+        # log the result
         logger.info(f"Hour {previous_hour}: {self.current_hour_posts} posts, "
               f"File size: {file_size} bytes")
 
@@ -132,12 +152,33 @@ class MastodonStreamListener(StreamListener):
                 with gzip.open(self.file_name + '.gz', 'wb') as gzip_file:
                     gzip_file.writelines(file)
 
-            # Remove the original JSON file
-            os.remove(self.file_name)
+        # Get file size in bytes
+        file_size = os.path.getsize(self.file_name)
+
+        logger.info("-" * 50)
+        logger.info(f"End of the Day: {__file__}")
+
+        logger.info(f"Date {self.current_date}: {self.posts_count_per_day} posts, "
+              f"File size: {file_size} bytes")
+        logger.info("-" * 50)
 
         # Reset counters and file info for the new day
         self.current_date = datetime.datetime.now().date()
         self.current_hour = datetime.datetime.now().hour
         self.current_hour_posts = 0
-        self.file_name = f"mastdonsocial_{self.current_date}.json"
+
+        self.file_name = f"{self.instance_name}_{self.stream_method}_{self.current_date}.json"
         self.current_file = None
+
+
+def stream_public_data(instance_info):
+    # Create a Mastodon client
+    mastodon_stream = Mastodon(
+        access_token=instance_info['access_token'],
+        api_base_url=instance_info['api_base_url']
+    )
+    
+    # Use the access token for user streaming
+    mastodon_stream.access_token = instance_info['access_token']
+    stream_listener = MastodonStreamListener(instance_info['api_base_url'])
+    mastodon_stream.stream_public(stream_listener)

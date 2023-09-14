@@ -1,0 +1,12 @@
+{
+  "mastodon_servers":[
+    {
+      "access_token":"FUmbJ4X2H9W9asbpBWspQDd1B5iJUPOgp9fXlgW0mMM",
+      "api_base_url":"https://mastodon.social"
+    },
+    {
+      "access_token":"Jo4ykUA2i56eBWuk0J_sHJ7_TVVU0_4JmzUQimXwokk",
+      "api_base_url":"https://mastodon.cloud"
+    }
+  ]
+}
