@@ -56,28 +56,6 @@ class MastodonStreamListener(StreamListener):
         except Exception as e:
             logger.error(f"An error occurred: {str(e)}")
 
-
-    def get_folder_name(self):
-        """
-        This function is used to get the exact files names to store the streaming data.
-        Parameters
-            None
-        Returns
-            File paths referring to different mastodon servers.
-        -----------
-        """
-        try:
-            # Get the current month and date for the filename
-            current_year_month = datetime.datetime.now().strftime("%Y-%m")
-            current_date = datetime.datetime.now().strftime("%Y-%m-%d")
-
-            instance_name = self.instance_name[len("https://"):]
-            logger.info(f"start streaming data : {instance_name}")
-            return os.path.join(backend_util.DATA_DERIVED_DIR, current_year_month, f"{current_date}", f"{instance_name}_{current_date}.json")
-
-        except Exception as e:
-            logger.error(f"An error occurred: {str(e)}")
-
     def on_update(self, status):
         """
         Collect the mastodon streaming data from the following format and
