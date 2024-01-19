@@ -133,7 +133,7 @@ class MastodonStreamListener(StreamListener):
             logger.info(f"Gzip file created successfully: {gzip_file_path}")
 
             # Delete the file after creation
-            os.remove(previous_file_location)
+            shutil.rmtree(previous_file_location)
             logger.info(f"File deleted successfully: {previous_file_location}")
 
         except Exception as e:
