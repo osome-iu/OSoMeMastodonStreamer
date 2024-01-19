@@ -1,6 +1,6 @@
 """
 Purpose:
-    This script used to get the mastodon_streamer api and data. post data.
+    This script used to get the app api and data. post data.
 Inputs:
     - functions
         - get_file_name (get the file name)
@@ -12,18 +12,13 @@ Outputs:
 Authors: Pasan Kamburugamuwa
 """
 
-import datetime, gzip, os, json
+import datetime, gzip, os, json,shutil, tarfile
 from mastodon import Mastodon, StreamListener
 from library import backend_util
 
-# Specify the directory path where the files will be stored
-DATA_DERIVED_DIR = "/Users/pkamburu/IUNI/mastodon/data_derived"
-LOG_DIR = "/Users/pkamburu/IUNI/mastodon/logs"
-
-# Create a logger
-LOG_FNAME = "mastodon_streamer_logging.log"
+# Create a logger for this file.
 script_name = os.path.basename(__file__)
-logger = backend_util.get_logger(LOG_DIR, LOG_FNAME, script_name=script_name, also_print=True)
+logger = backend_util.get_logger(backend_util.LOG_DIR, backend_util.LOG_FNAME, script_name=script_name, also_print=True)
 
 
 # Define a custom stream listener
@@ -33,33 +28,60 @@ class MastodonStreamListener(StreamListener):
 
         self.instance_name = instance_name
 
-        self.current_hour_posts = 0
-        self.posts_count_per_day = 0
-
         # Get the current date
         self.current_date = datetime.datetime.now().date()
         # Get the current hour
         self.current_hour = datetime.datetime.now().hour
-        self.file_name = self.get_file_name()
+        # Get the current file name
+        self.file_name = self.get_exact_file_name()
 
-    def get_file_name(self):
-
+    def get_exact_file_name(self):
+        """
+        This function is used to get the exact files names to store the streaming data.
+        Parameters
+            None
+        Returns
+            File paths referring to different mastodon servers.
+        -----------
+        """
         try:
             # Get the current month and date for the filename
-            current_month = datetime.datetime.now().strftime("%Y-%m")
+            current_year_month = datetime.datetime.now().strftime("%Y-%m")
             current_date = datetime.datetime.now().strftime("%Y-%m-%d")
 
-            # Create the directory if it doesn't exist
             instance_name = self.instance_name[len("https://"):]
-            logger.info(f"Get the file : {instance_name}-{current_date}")
-            return os.path.join(DATA_DERIVED_DIR, current_month, f"{current_date}", f"{instance_name}_{current_date}.json")
+            logger.info(f"start streaming data : {instance_name}")
+            return os.path.join(backend_util.DATA_DERIVED_DIR, current_year_month, f"{current_date}", f"{instance_name}_{current_date}.json")
+
+        except Exception as e:
+            logger.error(f"An error occurred: {str(e)}")
+
+
+    def get_folder_name(self):
+        """
+        This function is used to get the exact files names to store the streaming data.
+        Parameters
+            None
+        Returns
+            File paths referring to different mastodon servers.
+        -----------
+        """
+        try:
+            # Get the current month and date for the filename
+            current_year_month = datetime.datetime.now().strftime("%Y-%m")
+            current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+
+            instance_name = self.instance_name[len("https://"):]
+            logger.info(f"start streaming data : {instance_name}")
+            return os.path.join(backend_util.DATA_DERIVED_DIR, current_year_month, f"{current_date}", f"{instance_name}_{current_date}.json")
 
         except Exception as e:
             logger.error(f"An error occurred: {str(e)}")
 
     def on_update(self, status):
         """
-        Increment the post count for each received toot
+        Collect the mastodon streaming data from the following format and
+        if the date is changed, then save the data to a new file.
         Parameters
         -----------
         None
@@ -67,23 +89,12 @@ class MastodonStreamListener(StreamListener):
         -----------
         .gz file create and remove the mastodon_{current_date}.json file.
         """
-        # Increment the post count for each received toot
-        self.posts_count_per_day += 1
-        self.current_hour_posts += 1
-
         #In this function is used to check if there is a new date started.
         now = datetime.datetime.now()
         if now.date() != self.current_date:
             self.end_of_day()
 
-        # Check if an hour has passed, print the result and reset the counter
-        current_hour = datetime.datetime.now().hour
-        if current_hour != self.current_hour:
-            self.log_posts_and_file_size()
-            self.current_hour_posts = 1
-            self.current_hour = current_hour
-
-        # Write toot info to JSON file
+        # Write toot info to JSON file with this format.
         toot_info = {
             'id': status['id'],  # ID of the status in the database.
             'uri': status['uri'],  # URI of the status used for federation
@@ -112,74 +123,43 @@ class MastodonStreamListener(StreamListener):
         # Create directories for the current month and date if they don't exist
         os.makedirs(os.path.dirname(self.file_name), exist_ok=True)
 
+        # write the data to the file.
         with open(self.file_name, 'a') as file:
             json.dump(toot_info, file, default=str)
             file.write('\n')
 
-    def log_posts_and_file_size(self):
-        """
-        This function is used to print the post size and file size for each hour.
-        Parameters
-        -----------
-        None
-        Returns
-        -----------
-        .gz file create and remove the mastodon_{current_date}.json file.
-        """
-        try:
-            current_hour = datetime.datetime.now().hour
-            previous_hour = (current_hour - 1) % 24
-
-            # Get file size in bytes
-            file_size = os.path.getsize(self.file_name)
-
-            # log the result
-            logger.info(f"Hour {previous_hour}: {self.current_hour_posts} posts, "
-                  f"File size: {file_size} bytes")
-        except FileNotFoundError:
-            logger.error(f"File '{self.file_name}' not found.")
-        except Exception as e:
-            logger.error(f"An error occurred: {str(e)}")
-
 
     def end_of_day(self):
         """
-        This function is used to store the json file in a .gz file and remove the original json file.
-        Parameters
-        -----------
-        None
-        Returns
-        -----------
-        .gz file create and remove the mastodon_{current_date}.json file.
+        This function is used to make a .gz file for each end of the day for each mastodon server.
+        Parameters:
+            None
+        Returns:
+            None
+        .gz file is created, and the mastodon_{current_date}.json file is removed.
         """
-        # Close the current JSON file if it's open
-        if self.current_file:
-            self.current_file.close()
+        # Get the previous date
+        previous_date = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+        previous_date_year_month = previous_date[:-3]
 
-        # Gzip the previous day's JSON file
-        if os.path.isfile(self.file_name):
-            with open(self.file_name, 'rb') as file:
-                with gzip.open(self.file_name + '.gz', 'wb') as gzip_file:
-                    gzip_file.writelines(file)
+        previous_file_location = os.path.join(backend_util.DATA_DERIVED_DIR, previous_date_year_month,  previous_date)
+        logger.info(previous_file_location)
+        # Construct the file path for the gzip file
+        gzip_file_path = os.path.join(backend_util.DATA_DERIVED_DIR, previous_date_year_month, f"{previous_date}.tar.gz")
 
-        # Get file size in bytes
-        file_size = os.path.getsize(self.file_name)
+        try:
+            # Create a tar archive from the directory
+            with tarfile.open(gzip_file_path, 'w:gz') as tar:
+                tar.add(backend_util.DATA_DERIVED_DIR, arcname=os.path.basename(backend_util.DATA_DERIVED_DIR))
 
-        logger.info("-" * 50)
-        logger.info(f"End of the Day: {__file__}")
+            logger.info(f"Gzip file created successfully: {gzip_file_path}")
 
-        logger.info(f"Date {self.current_date}: {self.posts_count_per_day} posts, "
-              f"File size: {file_size} bytes")
-        logger.info("-" * 50)
+            # Delete the file after creation
+            os.remove(previous_file_location)
+            logger.info(f"File deleted successfully: {previous_file_location}")
 
-        # Reset counters and file info for the new day
-        self.current_date = datetime.datetime.now().date()
-        self.current_hour = datetime.datetime.now().hour
-        self.current_hour_posts = 0
-
-        self.file_name = f"{self.instance_name}_{self.stream_method}_{self.current_date}.json"
-        self.current_file = None
-
+        except Exception as e:
+            logger.error(f"Error creating gzip file or deleting the file: {e}")
 
 def stream_public_data(instance_info):
     # Create a Mastodon client
@@ -187,7 +167,6 @@ def stream_public_data(instance_info):
         access_token=instance_info['access_token'],
         api_base_url=instance_info['api_base_url']
     )
-
     # Use the access token for post streaming
     stream_listener = MastodonStreamListener(instance_info['api_base_url'])
     mastodon_stream.stream_public(stream_listener)

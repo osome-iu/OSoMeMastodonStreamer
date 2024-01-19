@@ -9,6 +9,12 @@ Author: Pasan Kamburugamuwa
 """
 
 import os, sys,logging
+
+# Log file location and the file
+LOG_DIR = "/Users/pkamburu/IUNI/mastodon_log"
+LOG_FNAME = "mastodon_streamer_logging.log"
+DATA_DERIVED_DIR = "/Users/pkamburu/IUNI/mastodon_derived_data"
+
 def get_logger(log_dir, log_fname, script_name=None, also_print=False):
     """
     Create logger for the project.
