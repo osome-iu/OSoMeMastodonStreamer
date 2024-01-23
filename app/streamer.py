@@ -27,7 +27,7 @@ class MastodonStreamListener(StreamListener):
         super().__init__()
 
         self.instance_name = instance_name
-
+        self.ten_minutes_executed = False
         # Get the current date
         self.current_date = datetime.datetime.now().date()
         # Get the current hour
@@ -70,7 +70,8 @@ class MastodonStreamListener(StreamListener):
         #In this function is used to check if there is a new date started.
         now = datetime.datetime.now()
         if now.date() != self.current_date:
-            self.end_of_day()
+            self.end_of_day_gzip_create()
+
 
         # Write toot info to JSON file with this format.
         toot_info = {
@@ -106,8 +107,7 @@ class MastodonStreamListener(StreamListener):
             json.dump(toot_info, file, default=str)
             file.write('\n')
 
-
-    def end_of_day(self):
+    def end_of_day_gzip_create(self):
         """
         This function is used to make a .gz file for each end of the day for each mastodon server.
         Parameters:
@@ -120,10 +120,11 @@ class MastodonStreamListener(StreamListener):
         previous_date = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
         previous_date_year_month = previous_date[:-3]
 
-        previous_file_location = os.path.join(backend_util.DATA_DERIVED_DIR, previous_date_year_month,  previous_date)
-        logger.info(previous_file_location)
+        previous_file_location = os.path.join(backend_util.DATA_DERIVED_DIR, previous_date_year_month, previous_date)
+
         # Construct the file path for the gzip file
-        gzip_file_path = os.path.join(backend_util.DATA_DERIVED_DIR, previous_date_year_month, f"{previous_date}.tar.gz")
+        gzip_file_path = os.path.join(backend_util.DATA_DERIVED_DIR, previous_date_year_month,
+                                      f"{previous_date}.tar.gz")
 
         try:
             # Create a tar archive from the directory
@@ -132,12 +133,20 @@ class MastodonStreamListener(StreamListener):
 
             logger.info(f"Gzip file created successfully: {gzip_file_path}")
 
-            # Delete the file after creation
-            shutil.rmtree(previous_file_location)
-            logger.info(f"File deleted successfully: {previous_file_location}")
-
+            try:
+                # Delete the file after creation
+                if os.path.exists(previous_file_location):
+                    shutil.rmtree(previous_file_location)
+                    logger.info(f"Directory deleted successfully: {previous_file_location}")
+                    return
+                else:
+                    logger.info(f"Directory does not exist: {previous_file_location}")
+            except Exception as e:
+                logger.error(f"Error deleting file: {e}")
         except Exception as e:
-            logger.error(f"Error creating gzip file or deleting the file: {e}")
+            logger.error(f"Error creating gzip file: {e}")
+        return
+
 
 def stream_public_data(instance_info):
     # Create a Mastodon client
