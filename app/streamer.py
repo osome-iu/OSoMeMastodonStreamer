@@ -67,6 +67,14 @@ class MastodonStreamListener(StreamListener):
         -----------
         .gz file create and remove the mastodon_{current_date}.json file.
         """
+
+        #In this function is used to check if there is a new date started.
+        now = datetime.datetime.now()
+
+        if now.date() != self.current_date:
+            self.get_exact_file_name()
+
+
         # Write toot info to JSON file with this format.
         toot_info = {
             'id': status['id'],  # ID of the status in the database.
