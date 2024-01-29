@@ -72,8 +72,8 @@ class MastodonStreamListener(StreamListener):
         now = datetime.datetime.now()
 
         if now.date() != self.current_date:
-            self.get_exact_file_name()
-
+            self.current_date = now.date()
+            self.file_name = self.get_exact_file_name()
 
         # Write toot info to JSON file with this format.
         toot_info = {
@@ -110,11 +110,14 @@ class MastodonStreamListener(StreamListener):
             file.write('\n')
 
 def stream_public_data(instance_info):
-    # Create a Mastodon client
-    mastodon_stream = Mastodon(
-        access_token=instance_info['access_token'],
-        api_base_url=instance_info['api_base_url']
-    )
-    # Use the access token for post streaming
-    stream_listener = MastodonStreamListener(instance_info['api_base_url'])
-    mastodon_stream.stream_public(stream_listener)
+    try:
+        # Create a Mastodon client
+        mastodon_stream = Mastodon(
+            access_token=instance_info['access_token'],
+            api_base_url=instance_info['api_base_url']
+        )
+        # Use the access token for post streaming
+        stream_listener = MastodonStreamListener(instance_info['api_base_url'])
+        mastodon_stream.stream_public(stream_listener)
+    except Exception as e:
+        logger.error(f"An error occurred while streaming public data: {str(e)}")
