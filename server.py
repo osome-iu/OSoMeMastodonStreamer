@@ -15,6 +15,11 @@ from library import backend_util
 from app import streamer
 import threading
 
+
+# Create a logger for this file.
+script_name = os.path.basename(__file__)
+logger = backend_util.get_logger(backend_util.LOG_DIR, backend_util.LOG_FNAME, script_name=script_name, also_print=True)
+
 def run_mastodon_servers():
 
     mastodon_servers = os.path.abspath('library/mastodon_servers.json')
@@ -38,11 +43,11 @@ def run_mastodon_servers():
             thread.join()
 
     except (KeyboardInterrupt, Exception) as e:
-
         logger.exception("Exception detected: {}".format(e))
         logger.info("Stopping threads...")
         for thread in threads:
             thread.join()
+
 
 
 if __name__ == '__main__':
@@ -51,6 +56,7 @@ if __name__ == '__main__':
     logger.info("-" * 50)
     logger.info(f"Begin script: {__file__}")
     logger.info(f"Start streaming mastodon data : {__file__}")
-    #run the mastodon servers to collect the data from different streams.
     run_mastodon_servers()
+
+
 

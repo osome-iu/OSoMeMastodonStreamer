@@ -15,6 +15,9 @@ Authors: Pasan Kamburugamuwa
 import datetime, gzip, os, json,shutil, tarfile
 from mastodon import Mastodon, StreamListener
 from library import backend_util
+import sys
+import schedule
+import time
 
 # Create a logger for this file.
 script_name = os.path.basename(__file__)
@@ -73,6 +76,8 @@ class MastodonStreamListener(StreamListener):
 
         if now.date() != self.current_date:
             self.current_date = now.date()
+            if self.file_name:
+                self.file_name.close()
             self.file_name = self.get_exact_file_name()
 
         # Write toot info to JSON file with this format.
@@ -109,6 +114,7 @@ class MastodonStreamListener(StreamListener):
             json.dump(toot_info, file, default=str)
             file.write('\n')
 
+
 def stream_public_data(instance_info):
     try:
         # Create a Mastodon client
@@ -119,5 +125,8 @@ def stream_public_data(instance_info):
         # Use the access token for post streaming
         stream_listener = MastodonStreamListener(instance_info['api_base_url'])
         mastodon_stream.stream_public(stream_listener)
+    except ConnectionError as e:
+        logger.error(f"A connection error occurred while streaming public data: {str(e)}")
     except Exception as e:
-        logger.error(f"An error occurred while streaming public data: {str(e)}")
+        logger.error(f"An unexpected error occurred while streaming public data: {str(e)}")
+
