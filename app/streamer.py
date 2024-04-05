@@ -116,17 +116,24 @@ class MastodonStreamListener(StreamListener):
 
 
 def stream_public_data(instance_info):
-    try:
-        # Create a Mastodon client
-        mastodon_stream = Mastodon(
-            access_token=instance_info['access_token'],
-            api_base_url=instance_info['api_base_url']
-        )
-        # Use the access token for post streaming
-        stream_listener = MastodonStreamListener(instance_info['api_base_url'])
-        mastodon_stream.stream_public(stream_listener)
-    except ConnectionError as e:
-        logger.error(f"A connection error occurred while streaming public data: {str(e)}")
-    except Exception as e:
-        logger.error(f"An unexpected error occurred while streaming public data: {str(e)}")
+    while True:
+        try:
+            # Create a Mastodon client
+            mastodon_stream = Mastodon(
+                access_token=instance_info['access_token'],
+                api_base_url=instance_info['api_base_url']
+            )
+            # Use the access token for post streaming
+            stream_listener = MastodonStreamListener(instance_info['api_base_url'])
+            mastodon_stream.stream_public(stream_listener)
+        except ConnectionError as e:
+            logger.error(f"A connection error occurred while streaming public data: {str(e)}")
+            # Wait for some time before retrying
+            time.sleep(60)
+        except Exception as e:
+            logger.error(
+                f"An unexpected error occurred while streaming public data: {str(e)} - {instance_info['api_base_url']}")
+            # Wait for some time before retrying
+            time.sleep(60)
+
 
