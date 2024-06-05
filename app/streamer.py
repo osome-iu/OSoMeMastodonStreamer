@@ -12,12 +12,13 @@ Outputs:
 Authors: Pasan Kamburugamuwa
 """
 
-import datetime, gzip, os, json,shutil, tarfile
+import gzip, os, json,shutil, tarfile
 from mastodon import Mastodon, StreamListener
 from library import backend_util
 import sys
 import schedule
 import time
+from datetime import datetime
 
 # Create a logger for this file.
 script_name = os.path.basename(__file__)
@@ -30,11 +31,8 @@ class MastodonStreamListener(StreamListener):
         super().__init__()
 
         self.instance_name = instance_name
-        self.ten_minutes_executed = False
         # Get the current date
-        self.current_date = datetime.datetime.now().date()
-        # Get the current hour
-        self.current_hour = datetime.datetime.now().hour
+        self.current_date = datetime.now().date()
         # Get the current file name
         self.file_name = self.get_exact_file_name()
 
@@ -49,8 +47,8 @@ class MastodonStreamListener(StreamListener):
         """
         try:
             # Get the current month and date for the filename
-            current_year_month = datetime.datetime.now().strftime("%Y-%m")
-            current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+            current_year_month = datetime.now().strftime("%Y-%m")
+            current_date = datetime.now().strftime("%Y-%m-%d")
 
             instance_name = self.instance_name[len("https://"):]
             logger.info(f"start streaming data : {instance_name}")
@@ -72,10 +70,10 @@ class MastodonStreamListener(StreamListener):
         """
 
         #In this function is used to check if there is a new date started.
-        now = datetime.datetime.now()
+        system_date = datetime.now()
 
-        if now.date() != self.current_date:
-            self.current_date = now.date()
+        if system_date.date() != self.current_date:
+            self.current_date = system_date
             if self.file_name:
                 self.file_name.close()
             self.file_name = self.get_exact_file_name()
@@ -104,6 +102,7 @@ class MastodonStreamListener(StreamListener):
             'card': status['card'],  # Preview card for links included within status content.
             'language': status['language'],  # Primary language of this status.
             'edited_at': status['edited_at'],  # Timestamp of when the status was last edited.
+            'system_date': system_date
         }
 
         # Create directories for the current month and date if they don't exist
@@ -113,7 +112,6 @@ class MastodonStreamListener(StreamListener):
         with open(self.file_name, 'a') as file:
             json.dump(toot_info, file, default=str)
             file.write('\n')
-
 
 def stream_public_data(instance_info):
     while True:
@@ -128,12 +126,8 @@ def stream_public_data(instance_info):
             mastodon_stream.stream_public(stream_listener)
         except ConnectionError as e:
             logger.error(f"A connection error occurred while streaming public data: {str(e)}")
-            # Wait for some time before retrying
-            time.sleep(60)
         except Exception as e:
             logger.error(
                 f"An unexpected error occurred while streaming public data: {str(e)} - {instance_info['api_base_url']}")
-            # Wait for some time before retrying
-            time.sleep(60)
 
 
