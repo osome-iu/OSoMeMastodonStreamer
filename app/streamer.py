@@ -73,7 +73,7 @@ class MastodonStreamListener(StreamListener):
         system_date = datetime.now()
 
         if system_date.date() != self.current_date:
-            self.current_date = system_date
+            self.current_date = system_date.date()
             if self.file_name:
                 self.file_name.close()
             self.file_name = self.get_exact_file_name()
@@ -102,7 +102,14 @@ class MastodonStreamListener(StreamListener):
             'card': status['card'],  # Preview card for links included within status content.
             'language': status['language'],  # Primary language of this status.
             'edited_at': status['edited_at'],  # Timestamp of when the status was last edited.
-            'system_date': system_date
+            'system_date': system_date, # Write the system date
+            'favourited': status.get('favourited'),  # Optional field - If the current token has an authorized user
+            'reblogged': status.get('reblogged'),  # Optional field - If the current token has an authorized user
+            'muted': status.get('muted'),  # Optional field - If the current token has an authorized user
+            'bookmarked': status.get('bookmarked'),  # Optional field - If the current token has an authorized user
+            'pinned': status.get('pinned'),  # Optional field - If the current token has an authorized user
+            'filtered': status.get('filtered'),  # Optional field - If the current token has an authorized user
+            'text': status.get('text'),  # Optional field -
         }
 
         # Create directories for the current month and date if they don't exist
