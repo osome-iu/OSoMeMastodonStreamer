@@ -18,7 +18,7 @@ from library import backend_util
 import sys
 import schedule
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Create a logger for this file.
 script_name = os.path.basename(__file__)
@@ -31,10 +31,7 @@ class MastodonStreamListener(StreamListener):
         super().__init__()
 
         self.instance_name = instance_name
-        # Get the current date
-        self.current_date = datetime.now().date()
-        # Get the current file name
-        self.file_name = self.get_exact_file_name()
+        self.system_date, self.file_name = self.get_exact_file_name()
 
     def get_exact_file_name(self):
         """
@@ -46,14 +43,14 @@ class MastodonStreamListener(StreamListener):
         -----------
         """
         try:
-            # Get the current month and date for the filename
-            current_year_month = datetime.now().strftime("%Y-%m")
-            current_date = datetime.now().strftime("%Y-%m-%d")
+            # Get the current time in UTC
+            current_time_utc = datetime.now(timezone.utc)
+            current_year_month = current_time_utc.strftime("%Y-%m")
+            current_date = current_time_utc.strftime("%Y-%m-%d")
 
             instance_name = self.instance_name[len("https://"):]
-            logger.info(f"start streaming data : {instance_name}")
-            return os.path.join(backend_util.DATA_DERIVED_DIR, current_year_month, f"{current_date}", f"{instance_name}_{current_date}.json")
-
+            file_path = os.path.join(backend_util.DATA_DERIVED_DIR, current_year_month, f"{current_date}", f"{instance_name}_{current_date}.json")
+            return current_time_utc, file_path
         except Exception as e:
             logger.error(f"An error occurred: {str(e)}")
 
@@ -68,20 +65,6 @@ class MastodonStreamListener(StreamListener):
         -----------
         .gz file create and remove the mastodon_{current_date}.json file.
         """
-
-        #In this function is used to check if there is a new date started.
-        system_date = datetime.now()
-
-        # Subtract 4 hours from the current time
-        adjusted_date = system_date - timedelta(hours=4)
-
-        # Check if the adjusted date is different from the current date
-        if adjusted_date.date() != self.current_date:
-            self.current_date = adjusted_date.date()
-            if self.file_name:
-                self.file_name.close()
-            self.file_name = self.get_exact_file_name()
-
         # Write toot info to JSON file with this format.
         toot_info = {
             'id': status['id'],  # ID of the status in the database.
@@ -106,7 +89,7 @@ class MastodonStreamListener(StreamListener):
             'card': status['card'],  # Preview card for links included within status content.
             'language': status['language'],  # Primary language of this status.
             'edited_at': status['edited_at'],  # Timestamp of when the status was last edited.
-            'system_date': system_date, # Write the system date
+            'system_date': self.system_date, # Write the system date
             'favourited': status.get('favourited'),  # Optional field - If the current token has an authorized user
             'reblogged': status.get('reblogged'),  # Optional field - If the current token has an authorized user
             'muted': status.get('muted'),  # Optional field - If the current token has an authorized user
@@ -120,7 +103,7 @@ class MastodonStreamListener(StreamListener):
         os.makedirs(os.path.dirname(self.file_name), exist_ok=True)
 
         # write the data to the file.
-        with open(self.file_name, 'a') as file:
+        with open(self.file_name, 'a+') as file:
             json.dump(toot_info, file, default=str)
             file.write('\n')
 
