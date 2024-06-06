@@ -72,8 +72,12 @@ class MastodonStreamListener(StreamListener):
         #In this function is used to check if there is a new date started.
         system_date = datetime.now()
 
-        if system_date.date() != self.current_date:
-            self.current_date = system_date.date()
+        # Subtract 4 hours from the current time
+        adjusted_date = system_date - timedelta(hours=4)
+
+        # Check if the adjusted date is different from the current date
+        if adjusted_date.date() != self.current_date:
+            self.current_date = adjusted_date.date()
             if self.file_name:
                 self.file_name.close()
             self.file_name = self.get_exact_file_name()
