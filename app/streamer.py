@@ -123,5 +123,6 @@ def stream_public_data(instance_info):
         except Exception as e:
             logger.error(
                 f"An unexpected error occurred while streaming public data: {str(e)} - {instance_info['api_base_url']}")
+        time.sleep(60) #if the server cease communication, retry after 60 seconds.
 
 
