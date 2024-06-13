@@ -1,0 +1,34 @@
+name: /Users/nick/Desktop/iuni_stuff/OSoMeMastodonStreamer/venv
+channels:
+  - defaults
+dependencies:
+  - bzip2=1.0.8
+  - ca-certificates=2024.3.11
+  - expat=2.6.2
+  - libcxx=14.0.6
+  - libffi=3.4.4
+  - ncurses=6.4
+  - openssl=3.0.13
+  - pip=24.0
+  - python=3.12.3
+  - readline=8.2
+  - setuptools=69.5.1
+  - sqlite=3.45.3
+  - tk=8.6.14
+  - tzdata=2024a
+  - wheel=0.43.0
+  - xz=5.4.6
+  - zlib=1.2.13
+  - pip:
+      - blurhash==1.1.4
+      - certifi==2023.7.22
+      - charset-normalizer==3.2.0
+      - decorator==5.1.1
+      - idna==3.4
+      - mastodon-py==1.8.1
+      - python-dateutil==2.8.2
+      - python-magic==0.4.27
+      - requests==2.31.0
+      - six==1.16.0
+      - urllib3==2.0.4
+prefix: /Users/nick/Desktop/iuni_stuff/OSoMeMastodonStreamer/venv
