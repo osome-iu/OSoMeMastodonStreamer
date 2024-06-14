@@ -1,4 +1,25 @@
+"""
+Purpose:
+    Stream and save data from Mastodon servers given server name and access token.
+    Mastodon Streaming Ref: https://docs.joinmastodon.org/methods/streaming/
+    Google Service Account Ref: https://cloud.google.com/iam/docs/service-accounts-create
+    Google Sheet Python Ref: https://developers.google.com/sheets/api/quickstart/python
+
+Inputs:
+    'config.yml' - copy and start with 'config.yml.template'
+    
+    json file with list of server names and tokens -> {"mastodon_servers":[{"access_token":"","api_base_url":""},...,...,...]}
+        or
+    Google Sheet derived from https://instances.social/
+
+Outputs:
+    individual files for each instance, in path f"{config['base_folder']}/yyyy-mm/yyyy-mm-dd/{instance_name}_yyyy-mm-dd.json"
+
+Author(s): Nick Liu
+"""
+
 import os
+import sys
 import json
 from datetime import datetime, timezone
 import logging
@@ -6,10 +27,17 @@ from time import sleep
 from mastodon import Mastodon, StreamListener
 from urllib.parse import urlparse
 import threading
+import gspread
+# from google.oauth2.credentials import Credentials
+from google.oauth2.service_account import Credentials
+import yaml
 
+# Load configuration from config.yml
+with open('config.yml', 'r') as config_file:
+    config = yaml.safe_load(config_file)
 
 # Create log directory if not exists
-log_folder = "mastodon_log"
+log_folder = config['log_folder']
 if not os.path.exists(log_folder):
     os.makedirs(log_folder)
 
@@ -19,7 +47,7 @@ logging.basicConfig(filename=log_file_path, level=logging.INFO,
                     format='%(asctime)s %(levelname)s:%(message)s')
 
 # Create derived data folder if not exists
-base_folder = "mastodon_derived_data"
+base_folder = config['base_folder']
 if not os.path.exists(base_folder):
     os.makedirs(base_folder)
 
@@ -65,10 +93,86 @@ class MyStreamListener(StreamListener):
     def on_abort(self, err):
         logging.error(f'{self.server} - Streaming aborted:{err}')
 
-def load_servers(json_file):
-    with open(json_file, 'r') as f:
-        data = json.load(f)
-    return data['mastodon_servers']
+def load_servers_from_json(json_file):
+    if not os.path.exists(json_file):
+        logging.error(f"Server configuration file {json_file} does not exist.")
+        sys.exit(1)
+        
+    try:
+        with open(json_file, 'r') as f:
+            data = json.load(f)
+            server_list = data['mastodon_servers']
+            
+            # Deduplicate servers
+            unique_servers = {}
+            duplicates = []
+            
+            for server in server_list:
+                api_base_url = server['api_base_url']
+                if api_base_url in unique_servers:
+                    duplicates.append(server)
+                else:
+                    unique_servers[api_base_url] = server['access_token']
+            
+            if duplicates:
+                logging.warning(f"Found {len(duplicates)} duplicate server(s):")
+                for dup in duplicates:
+                    logging.warning(f"Duplicate: {dup['api_base_url']} with access token {dup['access_token']}")
+            
+            # Convert unique_servers back to list format
+            deduplicated_servers = [{'api_base_url': k, 'access_token': v} for k, v in unique_servers.items()]
+            logging.info(f'Configs loaded for {len(deduplicated_servers)} unique server(s).')
+        return deduplicated_servers
+    except Exception as e:
+        logging.error(f"Failed to load server configuration from {json_file}: {e}")
+        sys.exit(1)
+
+def load_servers_from_google_sheet(sheet_id, sheet_name, credentials_json):
+    try:
+        # Define the scope and create credentials
+        scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+        credentials = Credentials.from_service_account_file(credentials_json, scopes=scopes)
+
+        # Authorize and get the sheet
+        client = gspread.authorize(credentials)
+        sheet = client.open_by_key(sheet_id).worksheet(sheet_name)
+        
+        # Get all records from the sheet
+        records = sheet.get_all_records()
+
+        # Filter records that can stream data
+        filtered_records = [record for record in records if record.get("Can stream data? (Yes, or specify reason y not)") == "Yes"]
+
+        # Log the number of server configurations loaded
+        logging.info(f'Configs loaded for {len(filtered_records)} server(s) that can stream data.')
+        
+        # Deduplicate servers
+        unique_servers = {}
+        duplicates = []
+        
+        for server in filtered_records:
+            api_base_url = f"https://{server['name']}"
+            access_token = server['Access Token']
+            if api_base_url in unique_servers:
+                if unique_servers[api_base_url] != access_token:
+                    duplicates.append(server)
+            else:
+                unique_servers[api_base_url] = access_token
+        
+        if duplicates:
+            logging.warning(f"Found {len(duplicates)} duplicate server(s) with different access tokens:")
+            for dup in duplicates:
+                logging.warning(f"Duplicate: https://{dup['name']} with access token {dup['Access Token']}")
+        
+        # Convert unique_servers back to list format
+        deduplicated_servers = [{'api_base_url': k, 'access_token': v} for k, v in unique_servers.items()]
+        
+        logging.info(f"Loaded server configurations for {len(deduplicated_servers)} servers.")
+        return deduplicated_servers
+    except Exception as e:
+        logging.error(f"Failed to load server configuration from Google Sheet: {e}")
+        sys.exit(1)
+
 
 def start_streaming(server_info):
     while True:
@@ -90,8 +194,16 @@ def start_streaming(server_info):
             sleep(10)  # Wait for 10 seconds before trying to reconnect
 
 if __name__ == "__main__":
-    # Load servers from JSON file
-    servers = load_servers('library/mastodon_servers.json')
+    # Google Sheets settings
+    GOOGLE_SHEET_ID = config['google_sheet_id']
+    RANGE_NAME = config['range_name']
+    CREDENTIALS_JSON = config['credentials_json']
+
+    # Load servers from Google Sheets
+    servers = load_servers_from_google_sheet(GOOGLE_SHEET_ID, RANGE_NAME, CREDENTIALS_JSON)
+
+    # # Load servers from JSON file
+    # servers = load_servers_from_json(config['server_list_json'])
 
     threads = []
     for server_info in servers:
