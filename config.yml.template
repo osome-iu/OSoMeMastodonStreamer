@@ -4,3 +4,5 @@ credentials_json: "/path/to/file.json"
 server_list_json: "/path/to/file.json"
 base_folder: "/path/to/folder"
 log_folder: "/path/to/folder"
+backup_folder: "/path/to/folder" [optional]
+backup_email: "your_email@example.com" [optional]

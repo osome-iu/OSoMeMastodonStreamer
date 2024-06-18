@@ -10,3 +10,9 @@ This project uses [Mastodon.py](https://mastodonpy.readthedocs.io/en/stable/inde
   - `pip install -r requirements.txt`
 - make a copy of `config.yml.template` and `mastodon_servers.json.template`, fill out the contents accordingly.
 - run it `python streamer.py`
+
+---
+
+*optional backup bash script uses python package `yq` that wraps around `jq` 
+
+`sudo apt-get install jq` `pip3 install yq`
