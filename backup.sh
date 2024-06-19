@@ -95,13 +95,18 @@ if [ -d "$input_directory" ]; then
                 exit 1
             fi
         done
-        # Copy the gzipped files to the backup location
-        cp -r "$input_directory" "$backup_folder"
+        # Create the target directory in the backup location if it doesn't exist
+        target_directory="$backup_folder/$year-$month/$yesterday"
+        if [ ! -d "$target_directory" ]; then
+            mkdir -p "$target_directory"
+        fi
+        # Copy all content to the backup location
+        cp -r "$input_directory"/* "$target_directory"
         if [ $? -eq 0 ]; then
-            log_message "Backup completed successfully to: $backup_folder"
+            log_message "Backup completed successfully to: $target_directory"
         else
-            log_message "Error: Failed to copy files to backup location: $backup_folder"
-            send_email "Backup Script Failure" "Error: Failed to copy files to backup location: $backup_folder"
+            log_message "Error: Failed to copy files to backup location: $target_directory"
+            send_email "Backup Script Failure" "Error: Failed to copy files to backup location: $target_directory"
             exit 1
         fi
     else
