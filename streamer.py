@@ -43,7 +43,7 @@ if not os.path.exists(log_folder):
 
 # Configure logging
 log_file_path = os.path.join(log_folder, 'mastodon_streamer.log')
-logging.basicConfig(filename=log_file_path, level=logging.INFO, 
+logging.basicConfig(filename=log_file_path, level=logging.DEBUG, 
                     format='%(asctime)s %(levelname)s:%(message)s')
 
 # Create derived data folder if not exists

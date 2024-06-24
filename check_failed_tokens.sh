@@ -24,7 +24,7 @@ formatted_errors_file="${log_folder}/formatted_errors.txt"
 
 # Execute the command
 grep "Received heartbeat" "$log_file" | awk '{ print $3 }' | sort | uniq > "$heartbeat_file"
-grep "ERROR" "$log_file" | grep "Could not connect to streaming server" | sed 's/^[^:]*:ERROR: //' | awk '{ $1=$2=""; sub(/^  */, ""); print "ERROR: " $0 }' | sort | uniq > "$error_file"
+grep "ERROR" "$log_file" | sed 's/^[^:]*:ERROR: //' | awk '{ $1=$2=""; sub(/^  */, ""); print "ERROR: " $0 }' | sort | uniq > "$error_file"
 comm -23 "$error_file" "$heartbeat_file" | sed 's/https:\/\///g' > "$servers_with_errors_no_heartbeat_file"
 
 # Set the path to your data directory
