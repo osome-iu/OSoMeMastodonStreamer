@@ -64,8 +64,8 @@ mkdir -p "$log_folder"
 data_directory="$base_folder"
 
 # Get yesterday's date in the format YYYY-MM-DD
-yesterday=$(date -d "yesterday" +%F)
-
+# yesterday=$(date -d "yesterday" +%F)
+yesterday=$(date +%F)
 # Extract year and month from yesterday's date
 year=$(date -d "$yesterday" +%Y)
 month=$(date -d "$yesterday" +%m)
@@ -76,6 +76,15 @@ input_directory="$data_directory/$year-$month/$yesterday"
 # Log file
 log_file="$log_folder/backup_log_$yesterday.txt"
 
+# Function to generate a summary of event types
+generate_summary() {
+    local json_file="$1"
+    local summary_file="$2"
+    jq -r '.event_type' "$json_file" | sort | uniq -c | awk '{print $2, $1}' > "$summary_file"
+    total_count=$(jq -s 'length' "$json_file")
+    echo "Total_Count $total_count" >> "$summary_file"
+}
+
 # Check if the input directory exists
 if [ -d "$input_directory" ]; then
     # Navigate to the input directory
@@ -84,11 +93,17 @@ if [ -d "$input_directory" ]; then
     if ls *.json 1> /dev/null 2>&1; then
         # Create gzip files for each individual file and delete the original JSON files
         for file in *.json; do
+            # Generate summary for the JSON file
+            summary_file="${file%.json}_summary.txt"
+            generate_summary "$file" "$summary_file"
+            
+            # Gzip the JSON file
             gzip -c "$file" > "${file}.gz"
             if [ $? -eq 0 ]; then
                 rm "$file"
                 log_message "Gzip file created successfully: ${file}.gz"
                 log_message "Original file deleted successfully: $file"
+                log_message "Summary file created successfully: $summary_file"
             else
                 log_message "Error: Failed to gzip $file"
                 send_email "Backup Script Failure" "Error: Failed to gzip $file"
