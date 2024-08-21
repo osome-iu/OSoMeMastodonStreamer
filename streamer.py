@@ -23,6 +23,7 @@ import sys
 import json
 from datetime import datetime, timezone
 import logging
+from logging.handlers import RotatingFileHandler
 from time import sleep
 from mastodon import Mastodon, StreamListener
 from urllib.parse import urlparse
@@ -43,8 +44,15 @@ if not os.path.exists(log_folder):
 
 # Configure logging
 log_file_path = os.path.join(log_folder, 'mastodon_streamer.log')
-logging.basicConfig(filename=log_file_path, level=logging.DEBUG, 
-                    format='%(asctime)s %(levelname)s:%(message)s')
+
+# Set up a rotating file handler to keep logs within a 100 MB limit
+log_handler = RotatingFileHandler(log_file_path, maxBytes=100*1024*1024, backupCount=2)
+log_handler.setLevel(logging.DEBUG)
+log_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s:%(message)s'))
+
+# Apply the handler to the root logger
+logging.getLogger().addHandler(log_handler)
+logging.getLogger().setLevel(logging.DEBUG)
 
 # Create derived data folder if not exists
 base_folder = config['base_folder']

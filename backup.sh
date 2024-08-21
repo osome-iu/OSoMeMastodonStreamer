@@ -64,8 +64,7 @@ mkdir -p "$log_folder"
 data_directory="$base_folder"
 
 # Get yesterday's date in the format YYYY-MM-DD
-# yesterday=$(date -d "yesterday" +%F)
-yesterday=$(date +%F)
+yesterday=$(date -d "yesterday" +%F)
 # Extract year and month from yesterday's date
 year=$(date -d "$yesterday" +%Y)
 month=$(date -d "$yesterday" +%m)

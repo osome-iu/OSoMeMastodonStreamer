@@ -51,7 +51,7 @@ if [[ -s "$formatted_errors_file" ]]; then
     # Send email notification
     echo "$MESSAGE. Sending email notification on failed tokens..."
     # Send email if there is output
-    cat "$formatted_errors_file" | mailx -s "Servers with Errors but No Heartbeat or Data" "$TO"
+    cat "$formatted_errors_file" | mailx -s "Servers with Errors & No Heartbeat or Data" "$TO"
 fi
 
 # Remove temporary files
