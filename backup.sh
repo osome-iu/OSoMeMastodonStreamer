@@ -84,6 +84,38 @@ generate_summary() {
     echo "Total_Count $total_count" >> "$summary_file"
 }
 
+# Function to clean up old log files
+cleanup_old_logs() {
+    log_message "Starting cleanup of old log files."
+    find "$log_folder" -type f -name 'backup_log_*.txt' -mtime +10 -exec rm {} \;
+    if [ $? -eq 0 ]; then
+        log_message "Old logs older than 10 days have been deleted successfully."
+    else
+        log_message "Error: Failed to delete old logs."
+        send_email "Backup Script Failure" "Error: Failed to delete old logs from $log_folder."
+        exit 1
+    fi
+}
+
+# Function to remove a directory with error handling
+remove_directory() {
+    local dir="$1"
+    if [ -d "$dir" ]; then
+        rm -r "$dir"
+        if [ $? -eq 0 ]; then
+            log_message "Successfully removed directory: $dir"
+        else
+            log_message "Error: Failed to remove directory: $dir"
+            send_email "Backup Script Failure" "Error: Failed to remove directory: $dir"
+            exit 1
+        fi
+    else
+        log_message "Error: Directory not found: $dir"
+        send_email "Backup Script Failure" "Error: Directory not found: $dir"
+        exit 1
+    fi
+}
+
 # Check if the input directory exists
 if [ -d "$input_directory" ]; then
     # Navigate to the input directory
@@ -118,6 +150,8 @@ if [ -d "$input_directory" ]; then
         cp -r "$input_directory"/* "$target_directory"
         if [ $? -eq 0 ]; then
             log_message "Backup completed successfully to: $target_directory"
+            # Remove the original directory after successful backup
+            remove_directory "$input_directory"
         else
             log_message "Error: Failed to copy files to backup location: $target_directory"
             send_email "Backup Script Failure" "Error: Failed to copy files to backup location: $target_directory"
@@ -133,3 +167,6 @@ else
     send_email "Backup Script Failure" "Error: Data directory for yesterday not found. ${input_directory}"
     exit 1
 fi
+
+# Clean up old logs
+cleanup_old_logs
