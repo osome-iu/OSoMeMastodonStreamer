@@ -97,7 +97,7 @@ def get_file_path(base_folder, domain):
     y_m_d_str = utc_now.strftime('%Y-%m-%d')
     folder_path = os.path.join(base_folder, utc_now.strftime('%Y-%m'), y_m_d_str, "new_users")
     os.makedirs(folder_path, exist_ok=True)
-    file_name = f"{domain}_{y_m_d_str}.json"
+    file_name = f"{domain}_{y_m_d_str}_new_users.json"
     file_path = os.path.join(folder_path, file_name)
 
     collected_at = utc_now.timestamp()
