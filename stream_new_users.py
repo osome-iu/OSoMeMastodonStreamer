@@ -30,6 +30,7 @@ import yaml
 import gspread
 import sys
 import time
+from collections import deque
 
 # Load configuration from config.yml
 with open('config.yml', 'r') as config_file:
@@ -52,40 +53,30 @@ log_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s:%(message)
 logging.getLogger().addHandler(log_handler)
 logging.getLogger().setLevel(logging.DEBUG)
 
-# Helper function to load the last 80*2 URLs from an existing file
 def tail(file, lines=160):
-    """Return the last `lines` lines from the file, efficiently."""
-    with open(file, 'rb') as f:
-        buffer_size = 1024
-        f.seek(0, os.SEEK_END)
-        end = f.tell()
-        blocks = []
-        block = -1
+    """Return the last `lines` lines from the file using a sliding window (deque)."""
+    sliding_window = deque(maxlen=lines)  # A deque to hold the last `lines` lines
+    
+    with open(file, 'r', encoding='utf-8') as f:
+        for line in f:
+            sliding_window.append(line)  # Append each line, deque will automatically discard the oldest
 
-        # Read the file backwards in chunks
-        while len(blocks) < lines and f.tell() > 0:
-            f.seek(max(end - buffer_size * (block + 1), 0))
-            chunk = f.read(min(buffer_size, end - f.tell()))
-            blocks = chunk.splitlines() + blocks
-            block += 1
+    # Decode the sliding window's contents as JSON
+    decoded_lines = []
+    current_json = ""
+    for line in sliding_window:
+        current_json += line
+        try:
+            decoded_line = json.loads(current_json)  # Try decoding the accumulated JSON string
+            decoded_lines.append(decoded_line)
+            current_json = ""  # Reset after successful decoding
+        except json.JSONDecodeError:
+            # If incomplete JSON, continue accumulating lines
+            continue
 
-        # Decode the blocks properly
-        decoded_lines = []
-        current_json = ""
-        for line in blocks:
-            try:
-                # Try to load each individual line as JSON
-                current_json += line.decode('utf-8')
-                decoded_line = json.loads(current_json)
-                decoded_lines.append(decoded_line)
-                current_json = ""  # Reset once we successfully decode a JSON object
-            except json.JSONDecodeError:
-                # If JSON decoding fails, continue concatenating lines
-                continue
+    return decoded_lines
 
-        return decoded_lines[-lines:]  # Return only the last `lines` decoded lines
-
-def load_last_urls(filename, limit=80):
+def load_last_urls(filename, limit=160):
     """Loads the last `limit` number of URLs from the file."""
     last_urls = set()
     if os.path.exists(filename):
