@@ -1,3 +1,23 @@
+"""
+Purpose:
+    Stream and save new user data from Mastodon servers.
+    Mastodon Directory Ref: https://docs.joinmastodon.org/methods/directory/
+    Google Service Account Ref: https://cloud.google.com/iam/docs/service-accounts-create
+    Google Sheet Python Ref: https://developers.google.com/sheets/api/quickstart/python
+
+Inputs:
+    'config.yml' - copy and start with 'config.yml.template'
+    
+    json file with list of server names and tokens -> {"mastodon_servers":[{"access_token(not needed)":"","api_base_url":""},...,...,...]}
+        or
+    Google Sheet derived from https://instances.social/
+
+Outputs:
+    individual files for each instance, in path f"{config['base_folder']}/yyyy-mm/yyyy-mm-dd/new_users/{instance_name}_yyyy-mm-dd.json"
+
+    
+Author(s): Nick Liu
+"""
 import aiohttp
 import asyncio
 import json
@@ -11,21 +31,26 @@ import gspread
 import sys
 import time
 
-# Create a RotatingFileHandler
-handler = RotatingFileHandler(
-    filename='account_creations.log',
-    maxBytes=10*1024*1024,
-    backupCount=3
-)
+# Load configuration from config.yml
+with open('config.yml', 'r') as config_file:
+    config = yaml.safe_load(config_file)
 
-# Set the log level and format for the handler
-handler.setLevel(logging.ERROR)
-formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-handler.setFormatter(formatter)
+# Create log directory if not exists
+log_folder = config['log_folder']
+if not os.path.exists(log_folder):
+    os.makedirs(log_folder)
 
-# Configure the root logger to use the rotating handler
-logging.getLogger().setLevel(logging.ERROR)
-logging.getLogger().addHandler(handler)
+# Configure logging
+log_file_path = os.path.join(log_folder, 'new_users.log')
+
+# Set up a rotating file handler to keep logs within a 10 MB limit
+log_handler = RotatingFileHandler(log_file_path, maxBytes=10*1024*1024, backupCount=2)
+log_handler.setLevel(logging.DEBUG)
+log_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s:%(message)s'))
+
+# Apply the handler to the root logger
+logging.getLogger().addHandler(log_handler)
+logging.getLogger().setLevel(logging.DEBUG)
 
 # Helper function to load the last 80*2 URLs from an existing file
 def tail(file, lines=160):
@@ -79,7 +104,7 @@ def load_last_urls(filename, limit=80):
 def get_file_path(base_folder, domain):
     utc_now = datetime.now(timezone.utc)
     y_m_d_str = utc_now.strftime('%Y-%m-%d')
-    folder_path = os.path.join(base_folder, utc_now.strftime('%Y-%m'), y_m_d_str)
+    folder_path = os.path.join(base_folder, utc_now.strftime('%Y-%m'), y_m_d_str, "new_users")
     os.makedirs(folder_path, exist_ok=True)
     file_name = f"{domain}_{y_m_d_str}.json"
     file_path = os.path.join(folder_path, file_name)
@@ -182,12 +207,37 @@ def load_servers_from_google_sheet(sheet_id, sheet_name, credentials_json):
         logging.error(f"Failed to load server configuration from Google Sheet: {e}")
         sys.exit(1)
 
+def load_servers_from_json(json_file):
+    if not os.path.exists(json_file):
+        logging.error(f"Server configuration file {json_file} does not exist.")
+        sys.exit(1)
+        
+    try:
+        with open(json_file, 'r') as f:
+            data = json.load(f)
+            server_list = data['mastodon_servers']
+            
+            # Deduplicate servers
+            unique_servers = set()
+            
+            for server in server_list:
+                domain = server['api_base_url'].split("/")[-1]
+                unique_servers.add(domain)
+            
+            logging.info(f'Configs loaded for {len(unique_servers)} unique server(s).')
+        return unique_servers
+    except Exception as e:
+        logging.error(f"Failed to load server configuration from {json_file}: {e}")
+        sys.exit(1)
+
+
 # Main function to run asynchronous tasks
-async def main(servers, data_folder):
+async def main(servers, base_folder):
+    logging.info(f"Saving files to {base_folder} ...")
     async with aiohttp.ClientSession() as session:
         tasks = []
         for server in servers:
-            tasks.append(fetch_and_save(session, server, data_folder))
+            tasks.append(fetch_and_save(session, server, base_folder))
         
         # Run all tasks concurrently
         await asyncio.gather(*tasks)
@@ -205,6 +255,12 @@ if __name__ == "__main__":
     # Load servers from Google Sheets
     servers = load_servers_from_google_sheet(GOOGLE_SHEET_ID, RANGE_NAME, CREDENTIALS_JSON)
 
+    # # Load servers from JSON file
+    # servers = load_servers_from_json(config['server_list_json'])
+
     # Run the main function with the loaded servers
-    data_folder = "user_creations"
-    asyncio.run(main(servers, data_folder))
+    # Create derived data folder if not exists
+    base_folder = config['base_folder']
+    if not os.path.exists(base_folder):
+        os.makedirs(base_folder)
+    asyncio.run(main(servers, base_folder))
