@@ -76,6 +76,9 @@ class MyStreamListener(StreamListener):
     def on_status_update(self, status):
         self.save_event('status.update', status)
 
+    def on_unknown_event(self, status):
+        self.save_event('unknown', status)
+
     def save_event(self, event_type, event_data):
         utc_now = datetime.now(timezone.utc)
         folder_path = os.path.join(base_folder, utc_now.strftime('%Y-%m'), utc_now.strftime('%Y-%m-%d'))
