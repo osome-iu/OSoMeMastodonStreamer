@@ -120,46 +120,47 @@ remove_directory() {
 if [ -d "$input_directory" ]; then
     # Navigate to the input directory
     cd "$input_directory" || { log_message "Error: Could not change directory to $input_directory"; send_email "Backup Script Failure" "Error: Could not change directory to $input_directory"; exit 1; }
-    # Check if there are any JSON files to process
-    if ls *.json 1> /dev/null 2>&1; then
-        # Create gzip files for each individual file and delete the original JSON files
-        for file in *.json; do
+    
+    # Find all JSON files in the directory and its subdirectories
+    find "$input_directory" -type f -name "*.json" | while read -r file; do
+        
+        # Check if the file ends with "_new_users.json" and skip summary if it does
+        if [[ "$file" != *_new_users.json ]]; then
             # Generate summary for the JSON file
             summary_file="${file%.json}_summary.txt"
             generate_summary "$file" "$summary_file"
-            
-            # Gzip the JSON file
-            gzip -c "$file" > "${file}.gz"
-            if [ $? -eq 0 ]; then
-                rm "$file"
-                log_message "Gzip file created successfully: ${file}.gz"
-                log_message "Original file deleted successfully: $file"
-                log_message "Summary file created successfully: $summary_file"
-            else
-                log_message "Error: Failed to gzip $file"
-                send_email "Backup Script Failure" "Error: Failed to gzip $file"
-                exit 1
-            fi
-        done
-        # Create the target directory in the backup location if it doesn't exist
-        target_directory="$backup_folder/$year-$month/$yesterday"
-        if [ ! -d "$target_directory" ]; then
-            mkdir -p "$target_directory"
-        fi
-        # Copy all content to the backup location
-        cp -r "$input_directory"/* "$target_directory"
-        if [ $? -eq 0 ]; then
-            log_message "Backup completed successfully to: $target_directory"
-            # Remove the original directory after successful backup
-            remove_directory "$input_directory"
+            log_message "Summary file created successfully: $summary_file"
         else
-            log_message "Error: Failed to copy files to backup location: $target_directory"
-            send_email "Backup Script Failure" "Error: Failed to copy files to backup location: $target_directory"
+            log_message "Skipping summary generation for $file"
+        fi
+        
+        # Gzip the JSON file
+        gzip -c "$file" > "${file}.gz"
+        if [ $? -eq 0 ]; then
+            rm "$file"
+            log_message "Gzip file created successfully: ${file}.gz"
+            log_message "Original file deleted successfully: $file"
+        else
+            log_message "Error: Failed to gzip $file"
+            send_email "Backup Script Failure" "Error: Failed to gzip $file"
             exit 1
         fi
+    done
+    
+    # Create the target directory in the backup location if it doesn't exist
+    target_directory="$backup_folder/$year-$month/$yesterday"
+    if [ ! -d "$target_directory" ]; then
+        mkdir -p "$target_directory"
+    fi
+    # Copy all content to the backup location
+    cp -r "$input_directory"/* "$target_directory"
+    if [ $? -eq 0 ]; then
+        log_message "Backup completed successfully to: $target_directory"
+        # Remove the original directory after successful backup
+        remove_directory "$input_directory"
     else
-        log_message "No JSON files found to process in $input_directory"
-        send_email "Backup Script Failure" "No JSON files found to process in $input_directory"
+        log_message "Error: Failed to copy files to backup location: $target_directory"
+        send_email "Backup Script Failure" "Error: Failed to copy files to backup location: $target_directory"
         exit 1
     fi
 else
