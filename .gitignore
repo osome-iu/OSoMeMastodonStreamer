@@ -5,3 +5,4 @@ venv/
 library/mastodon_servers.json
 config.yml
 service_acct.json
+.DS_Store
