@@ -9,7 +9,9 @@ This project uses [Mastodon.py](https://mastodonpy.readthedocs.io/en/stable/inde
   - `conda activate ./<myvenv>`
   - `pip install -r requirements.txt`
 - make a copy of `config.yml.template` and `mastodon_servers.json.template`, fill out the contents accordingly.
-- run it `python streamer.py`
+- run
+  - `python streamer.py` saves to `{base_folder}/{yyyy-mm}/{domain}_{yyyy-mm-dd}.json`
+  - `python stream_new_users.py` saves to `{base_folder}/{yyyy-mm}/new_users/{domain}_{yyyy-mm-dd}_new_users.json`
 
 ---
 
