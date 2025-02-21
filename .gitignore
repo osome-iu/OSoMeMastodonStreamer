@@ -1,2 +1,8 @@
 __pycache__/
 venv/
+/mastodon_derived_data
+/mastodon_log
+library/mastodon_servers.json
+config.yml
+service_acct.json
+.DS_Store

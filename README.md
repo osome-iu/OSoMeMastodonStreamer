@@ -1,39 +1,20 @@
 # Mastodon Streamer
-This project is used to collect Mastodon data from different servers and save them as gzip file at the end of the day.
+This project uses [Mastodon.py](https://mastodonpy.readthedocs.io/en/stable/index.html) to collect data from different Mastodon servers and save them to json files by date.
 
 
-# Project Structure
-- Backend: A [flask](https://flask.palletsprojects.com/en/2.3.x/) application that leverages the [[mastodonpy](https://mastodonpy.readthedocs.io/en/stable/index.html)) to retrieve data and manipulate the data.
+# quick start.
+- get conda installed if not https://docs.anaconda.com/free/miniconda/#quick-command-line-install
+- create conda venv
+  - `conda env create -p ./<myvenv> -f environment.yml`
+  - `conda activate ./<myvenv>`
+  - `pip install -r requirements.txt`
+- make a copy of `config.yml.template` and `mastodon_servers.json.template`, fill out the contents accordingly.
+- run
+  - `python streamer.py` saves to `{base_folder}/{yyyy-mm}/{domain}_{yyyy-mm-dd}.json`
+  - `python stream_new_users.py` saves to `{base_folder}/{yyyy-mm}/new_users/{domain}_{yyyy-mm-dd}_new_users.json`
 
+---
 
-## Packages
-- [Mastodon.py](https://mastodonpy.readthedocs.io/en/stable/index.html)
+*optional backup bash script uses python package `yq` that wraps around `jq` 
 
-
-# How to run the project.
-To run the project, you have to clone the project.
-Edit the [mastodon_servers.json](https://github.com/osome-iu/OSoMeMastodonStreamer/blob/main/library/mastodon_servers.json)  and add as below json.
-
-```
-  {
-   "mastodon_servers":[
-     {
-       "access_token":"XXXX",
-       "api_base_url":"https://mastodon.social"
-     },
-     {
-       "access_token":"XXX",
-       "api_base_url":"https://mastodon.cloud"
-     },
-     {
-       "access_token":"XXX",
-       "api_base_url":"https://genomic.social"
-     }  
-   ]
-  }
-```
-
-Then,
-  1. Install necessary pip packages. Run `pip install -r requirements.txt`.
-  2. Run your flask app by running `flask run --port <desired_port_number>`.
-
+`sudo apt-get install jq` `pip3 install yq`

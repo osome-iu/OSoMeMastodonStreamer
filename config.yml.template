@@ -1,0 +1,8 @@
+google_sheet_id: "Sheet_ID"
+range_name: "Sheet Name"
+credentials_json: "/path/to/file.json"
+server_list_json: "/path/to/file.json"
+base_folder: "/path/to/folder"
+log_folder: "/path/to/folder"
+backup_folder: "/path/to/folder" [optional]
+backup_email: "your_email@example.com" [optional]
