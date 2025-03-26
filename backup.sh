@@ -146,6 +146,25 @@ if [ -d "$input_directory" ]; then
             exit 1
         fi
     done
+
+    # Compress the `new_users` directory
+    new_users_dir="$input_directory/new_users"
+    archive_name="new_users_$yesterday.tar.gz"
+    archive_path="$input_directory/$archive_name"
+
+    if [ -d "$new_users_dir" ]; then
+        tar -czf "$archive_path" -C "$input_directory" "new_users"
+        if [ $? -eq 0 ]; then
+            log_message "Successfully created archive: $archive_path"
+            remove_directory "$new_users_dir"
+        else
+            log_message "Error: Failed to create archive of new_users folder"
+            send_email "Backup Script Failure" "Error: Failed to create archive of new_users"
+            exit 1
+        fi
+    else
+        log_message "Warning: new_users directory not found at $new_users_dir"
+    fi
     
     # Create the target directory in the backup location if it doesn't exist
     target_directory="$backup_folder/$year-$month/$yesterday"
