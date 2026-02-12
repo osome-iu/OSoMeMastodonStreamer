@@ -5,6 +5,6 @@ server_list_json: "/path/to/file.json"
 base_folder: "/path/to/folder"
 log_folder: "/path/to/folder"
 backup_folders:
- - "/path/to/backup/folder/once"
- - "/path/to/backup/folder/two"
-backup_email: "your_email@example.com" [optional]
+  - "/path/to/backup/folder/once"
+  - "/path/to/backup/folder/two"
+backup_email: "your_email@example.com"
