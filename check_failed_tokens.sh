@@ -22,7 +22,7 @@ existing_servers_file="${log_folder}/existing_servers.txt"
 filtered_servers_file="${log_folder}/filtered_servers_with_errors_no_heartbeat.txt"
 formatted_errors_file="${log_folder}/formatted_errors.txt"
 
-# NEW: failure counter file
+# Failure counter file
 failure_counter_file="${log_folder}/failure_counters.txt"
 touch "$failure_counter_file"
 
