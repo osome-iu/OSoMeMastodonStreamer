@@ -192,8 +192,8 @@ if [ -d "$input_directory" ]; then
     remove_directory "$input_directory"
 
 else
-    log_message "Error: Data directory for ${yesterday} not found. ${input_directory}"
-    send_email "Backup Script Failure" "Error: Data directory for ${yesterday} not found. ${input_directory}"
+    log_message "Error: Data directory for $yesterday not found. ${input_directory}"
+    send_email "Backup Script Failure" "Error: Data directory for $yesterday not found. ${input_directory}"
     exit 1
 fi
 
