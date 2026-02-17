@@ -22,16 +22,22 @@ existing_servers_file="${log_folder}/existing_servers.txt"
 filtered_servers_file="${log_folder}/filtered_servers_with_errors_no_heartbeat.txt"
 formatted_errors_file="${log_folder}/formatted_errors.txt"
 
+# Failure counter file
+failure_counter_file="${log_folder}/failure_counters.txt"
+touch "$failure_counter_file"
+
 # Execute the command
 grep -F "Received heartbeat" "$log_file" \
   | sed -n 's/.*DEBUG:\([^ ]*\) - Received heartbeat\..*/\1/p' \
   | sort -u > "$heartbeat_file"
+
 grep "ERROR" "$log_file" \
   | grep -vF "Failed to load server configuration from Google Sheet" \
   | sed 's/^[^:]*:ERROR: //' \
   | awk '{ $1=$2=""; sub(/^  */, ""); print "ERROR: " $0 }' \
   | sort \
   | uniq > "$error_file"
+
 comm -23 "$error_file" "$heartbeat_file" | sed 's/https:\/\///g' > "$servers_with_errors_no_heartbeat_file"
 
 # Set the path to your data directory
@@ -53,12 +59,64 @@ awk -F' from |: Could not connect to streaming server: ' '{print $2 "\t\t" $3}' 
 cat "$formatted_errors_file"
 
 
-# Check if the output file has content
-if [[ -s "$formatted_errors_file" ]]; then
-    # Send email notification
-    echo "$MESSAGE. Sending email notification on failed tokens..."
-    # Send email if there is output
-    cat "$formatted_errors_file" | mailx -s "Servers with Errors & No Heartbeat or Data" "$TO"
+# Update the failure counters
+declare -A counters
+
+# Load existing counters
+while read -r server count; do
+    [[ -n "$server" ]] && counters["$server"]=$count
+done < "$failure_counter_file"
+
+# Read today's failing servers
+today_failing=()
+while read -r line; do
+    server=$(echo "$line" | awk '{print $1}')
+    [[ -n "$server" ]] && today_failing+=("$server")
+done < "$formatted_errors_file"
+
+# Increment counters for today's failures
+for server in "${today_failing[@]}"; do
+    if [[ -n "${counters[$server]}" ]]; then
+        counters["$server"]=$(( counters["$server"] + 1 ))
+    else
+        counters["$server"]=1
+    fi
+done
+
+# Reset counters for servers that recovered
+for server in "${!counters[@]}"; do
+    if ! printf '%s\n' "${today_failing[@]}" | grep -q "^$server$"; then
+        unset counters["$server"]
+    fi
+done
+
+# Save updated counters
+: > "$failure_counter_file"
+for server in "${!counters[@]}"; do
+    echo "$server ${counters[$server]}" >> "$failure_counter_file"
+done
+
+# Send the email alert only if failing for 7+ days
+alert_needed=false
+alert_file="${log_folder}/servers_failing_7_days.txt"
+email_body="${log_folder}/email_body.txt"
+
+: > "$alert_file"
+
+for server in "${!counters[@]}"; do
+    if (( counters["$server"] >= 7 )); then
+        alert_needed=true
+        grep "^$server" "$formatted_errors_file" >> "$alert_file"
+    fi
+done
+
+if $alert_needed; then
+    echo "Servers failing for 7+ days" > "$email_body"
+    echo "" >> "$email_body"
+    cat "$alert_file" >> "$email_body"
+
+    echo "Sending email: servers failing for 7+ days..."
+    mailx -s "Servers failing for 7+ days" "$TO" < "$email_body"
 fi
 
 # Remove temporary files
