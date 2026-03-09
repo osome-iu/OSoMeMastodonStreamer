@@ -20,11 +20,13 @@ log_message() {
     echo "[$timestamp] $message" | tee -a "$log_file"
 }
 
-# Read base_folder, backup_folder, log_folder, and backup_email from config.yml
+# Read base_folder, log_folder, backup_email from config.yml
 base_folder=$(read_config '.base_folder')
-backup_folder=$(read_config '.backup_folder')
 log_folder=$(read_config '.log_folder')
 backup_email=$(read_config '.backup_email')
+
+### Read multiple backup folders
+backup_folders=($(read_config '.backup_folders[]'))
 
 # Check if yq was able to read the config values
 if [ -z "$base_folder" ]; then
@@ -33,9 +35,9 @@ if [ -z "$base_folder" ]; then
     exit 1
 fi
 
-if [ -z "$backup_folder" ]; then
-    log_message "Error: Could not read backup_folder from config.yml."
-    send_email "Backup Script Failure" "Error: Could not read backup_folder from config.yml."
+if [ ${#backup_folders[@]} -eq 0 ]; then
+    log_message "Error: Could not read backup_folders from config.yml."
+    send_email "Backup Script Failure" "Error: Could not read backup_folders from config.yml."
     exit 1
 fi
 
@@ -51,11 +53,17 @@ if [ -z "$backup_email" ]; then
     exit 1
 fi
 
-# Trim any leading or trailing quotes from the folder paths
+# Trim any leading or trailing quotes
 base_folder=$(echo "$base_folder" | sed 's/^"//' | sed 's/"$//')
-backup_folder=$(echo "$backup_folder" | sed 's/^"//' | sed 's/"$//')
 log_folder=$(echo "$log_folder" | sed 's/^"//' | sed 's/"$//')
 backup_email=$(echo "$backup_email" | sed 's/^"//' | sed 's/"$//')
+
+# Trim quotes for each backup folder
+clean_backup_folders=()
+for folder in "${backup_folders[@]}"; do
+    clean_backup_folders+=("$(echo "$folder" | sed 's/^"//' | sed 's/"$//')")
+done
+backup_folders=("${clean_backup_folders[@]}")
 
 # Ensure the log_folder exists
 mkdir -p "$log_folder"
@@ -65,7 +73,6 @@ data_directory="$base_folder"
 
 # Get yesterday's date in the format YYYY-MM-DD
 yesterday=$(date -d "yesterday" +%F)
-# Extract year and month from yesterday's date
 year=$(date -d "$yesterday" +%Y)
 month=$(date -d "$yesterday" +%m)
 
@@ -118,15 +125,11 @@ remove_directory() {
 
 # Check if the input directory exists
 if [ -d "$input_directory" ]; then
-    # Navigate to the input directory
     cd "$input_directory" || { log_message "Error: Could not change directory to $input_directory"; send_email "Backup Script Failure" "Error: Could not change directory to $input_directory"; exit 1; }
-    
-    # Find all JSON files in the directory and its subdirectories
+
     find "$input_directory" -type f -name "*.json" | while read -r file; do
         
-        # Check if the file ends with "_new_users.json" and skip summary if it does
         if [[ "$file" != *_new_users.json ]]; then
-            # Generate summary for the JSON file
             summary_file="${file%.json}_summary.txt"
             generate_summary "$file" "$summary_file"
             log_message "Summary file created successfully: $summary_file"
@@ -134,7 +137,6 @@ if [ -d "$input_directory" ]; then
             log_message "Skipping summary generation for $file"
         fi
         
-        # Gzip the JSON file
         gzip -c "$file" > "${file}.gz"
         if [ $? -eq 0 ]; then
             rm "$file"
@@ -147,7 +149,6 @@ if [ -d "$input_directory" ]; then
         fi
     done
 
-    # Compress the `new_users` directory
     new_users_dir="$input_directory/new_users"
     archive_name="new_users_$yesterday.tar.gz"
     archive_path="$input_directory/$archive_name"
@@ -165,28 +166,35 @@ if [ -d "$input_directory" ]; then
     else
         log_message "Warning: new_users directory not found at $new_users_dir"
     fi
-    
-    # Create the target directory in the backup location if it doesn't exist
-    target_directory="$backup_folder/$year-$month/$yesterday"
-    if [ ! -d "$target_directory" ]; then
+
+    # Multiple backup locations
+    for backup_folder in "${backup_folders[@]}"; do
+        target_directory="$backup_folder/$year-$month/$yesterday"
+
         mkdir -p "$target_directory"
-    fi
-    # Copy all content to the backup location
-    cp -r "$input_directory"/* "$target_directory"
-    if [ $? -eq 0 ]; then
-        log_message "Backup completed successfully to: $target_directory"
-        # Remove the original directory after successful backup
-        remove_directory "$input_directory"
-    else
-        log_message "Error: Failed to copy files to backup location: $target_directory"
-        send_email "Backup Script Failure" "Error: Failed to copy files to backup location: $target_directory"
-        exit 1
-    fi
+        if [ $? -ne 0 ]; then
+            log_message "Error: Failed to create backup directory: $target_directory"
+            send_email "Backup Script Failure" "Error: Failed to create backup directory: $target_directory"
+            exit 1
+        fi
+
+        cp -r "$input_directory"/* "$target_directory"
+        if [ $? -eq 0 ]; then
+            log_message "Backup completed successfully to: $target_directory"
+        else
+            log_message "Error: Failed to copy files to backup location: $target_directory"
+            send_email "Backup Script Failure" "Error: Failed to copy files to backup location: $target_directory"
+            exit 1
+        fi
+    done
+
+    # Only remove original directory after ALL backups succeed
+    remove_directory "$input_directory"
+
 else
-    log_message "Error: Data directory for yesterday not found. ${input_directory}"
-    send_email "Backup Script Failure" "Error: Data directory for yesterday not found. ${input_directory}"
+    log_message "Error: Data directory for $yesterday not found. ${input_directory}"
+    send_email "Backup Script Failure" "Error: Data directory for $yesterday not found. ${input_directory}"
     exit 1
 fi
 
-# Clean up old logs
 cleanup_old_logs
