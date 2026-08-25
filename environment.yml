@@ -48,3 +48,4 @@ dependencies:
       - six==1.16.0
       - urllib3==2.2.3
       - yarl==1.11.1
+prefix: /opt/anaconda3/envs/mastodon
