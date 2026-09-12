@@ -152,7 +152,7 @@ def load_servers_from_google_sheet(sheet_id, sheet_name, credentials_json):
         records = sheet.get_all_records()
 
         # Filter records that can stream data
-        filtered_records = [record for record in records if record.get("Can stream data? (Yes, or specify reason y not)") == "Yes"]
+        filtered_records = [record for record in records if record.get("Can stream data? (Yes, or specify reason why not)") == "Yes"]
 
         # Log the number of server configurations loaded
         logging.info(f'Configs loaded for {len(filtered_records)} server(s) that can stream data.')
