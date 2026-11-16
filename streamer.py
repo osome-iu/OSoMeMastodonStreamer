@@ -32,6 +32,11 @@ import gspread
 # from google.oauth2.credentials import Credentials
 from google.oauth2.service_account import Credentials
 import yaml
+import time
+from mastodon import MastodonUnauthorizedError
+
+MIN_DELAY = 10
+MAX_DELAY = 24 * 3600 
 
 # Load configuration from config.yml
 with open('config.yml', 'r') as config_file:
@@ -186,23 +191,30 @@ def load_servers_from_google_sheet(sheet_id, sheet_name, credentials_json):
 
 
 def start_streaming(server_info):
+    url = server_info['api_base_url']
+    delay = MIN_DELAY
     while True:
+        started = time.monotonic()
         try:
             mastodon = Mastodon(
                 access_token=server_info['access_token'],
-                api_base_url=server_info['api_base_url']
+                api_base_url=url
             )
-            
-            listener = MyStreamListener(server_info['api_base_url'])
-            logging.info(f"Listening to {server_info['api_base_url']}")
-            # Stream federated public timeline
+            listener = MyStreamListener(url)
+            logging.info(f"Listening to {url}")
             mastodon.stream_public(listener)
-            
-            # # Stream local public timeline
-            # mastodon.stream_local(listener)
+        except MastodonUnauthorizedError as e:
+            logging.error(f"{url} - UNAUTHORIZED: {e}")
         except Exception as e:
-            logging.error(f"Error in streaming from {server_info['api_base_url']}: {e}")
-            sleep(10)  # Wait for 10 seconds before trying to reconnect
+            logging.error(f"{url} - Error in streaming: {e}")
+
+        # If the stream stayed up for 5+ minutes, start the backoff over
+        if time.monotonic() - started > 300:
+            delay = MIN_DELAY
+
+        logging.info(f"{url} - Retrying in {delay}s")
+        sleep(delay)
+        delay = min(delay * 2, MAX_DELAY)
 
 if __name__ == "__main__":
     # Google Sheets settings
