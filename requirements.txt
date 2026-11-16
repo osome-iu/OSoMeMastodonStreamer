@@ -14,7 +14,7 @@ gspread==6.1.2
 idna==3.15
 Mastodon.py==1.8.1
 multidict
-oauthlib==4.0.0
+oauthlib==4.0.1
 pyasn1==0.6.5
 pyasn1_modules==0.4.1
 python-dateutil==2.9.0.post0
