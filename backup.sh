@@ -167,9 +167,22 @@ if [ -d "$input_directory" ]; then
         log_message "Warning: new_users directory not found at $new_users_dir"
     fi
 
-    # Multiple backup locations
+    # Create a .tar of the date folder (e.g. 2026-10-12.tar)
+    # Built next to the date folder so the tar doesn't include itself
+    tar_file="$data_directory/$year-$month/$yesterday.tar"
+    tar -cf "$tar_file" -C "$data_directory/$year-$month" "$yesterday"
+    if [ $? -eq 0 ]; then
+        log_message "Successfully created tar file: $tar_file"
+    else
+        log_message "Error: Failed to create tar file: $tar_file"
+        send_email "Backup Script Failure" "Error: Failed to create tar file: $tar_file"
+        rm -f "$tar_file"
+        exit 1
+    fi
+
+    # Multiple backup locations (now copies the .tar instead of the folder)
     for backup_folder in "${backup_folders[@]}"; do
-        target_directory="$backup_folder/$year-$month/$yesterday"
+        target_directory="$backup_folder/$year-$month"
 
         mkdir -p "$target_directory"
         if [ $? -ne 0 ]; then
@@ -178,15 +191,19 @@ if [ -d "$input_directory" ]; then
             exit 1
         fi
 
-        cp -r "$input_directory"/* "$target_directory"
+        cp "$tar_file" "$target_directory/"
         if [ $? -eq 0 ]; then
-            log_message "Backup completed successfully to: $target_directory"
+            log_message "Backup completed successfully to: $target_directory/$yesterday.tar"
         else
-            log_message "Error: Failed to copy files to backup location: $target_directory"
-            send_email "Backup Script Failure" "Error: Failed to copy files to backup location: $target_directory"
+            log_message "Error: Failed to copy tar to backup location: $target_directory"
+            send_email "Backup Script Failure" "Error: Failed to copy tar to backup location: $target_directory"
             exit 1
         fi
     done
+
+    # Only remove original directory and temporary tar after ALL backups succeed
+    remove_directory "$input_directory"
+    rm -f "$tar_file"
 
     # Only remove original directory after ALL backups succeed
     remove_directory "$input_directory"
