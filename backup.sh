@@ -180,7 +180,7 @@ if [ -d "$input_directory" ]; then
         exit 1
     fi
 
-    # Multiple backup locations (now copies the .tar instead of the folder)
+    # Multiple backup locations
     for backup_folder in "${backup_folders[@]}"; do
         target_directory="$backup_folder/$year-$month"
 
